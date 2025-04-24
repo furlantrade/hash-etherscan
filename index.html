@@ -1,104 +1,103 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Envio de ETH e USDT</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>Transação na Rede Tenderly</title>
+  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; }
+    .card {
+      max-width: 650px; margin: auto; background: #fff; padding: 20px;
+      border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .field { margin-bottom: 12px; }
+    .field label { font-weight: bold; }
+    .hash, .address { word-break: break-all; }
+    button {
+      padding: 8px 16px; background: #4CAF50; border: none;
+      border-radius: 5px; color: white; cursor: pointer;
+    }
+    button.copy { background: #555; margin-left: 10px; }
+  </style>
 </head>
-<body class="bg-gray-100 p-6">
-  <div class="max-w-lg mx-auto bg-white p-6 rounded-2xl shadow-lg">
-    <h1 class="text-2xl font-bold text-center text-blue-700 mb-4">Envio de ETH ou USDT</h1>
-
-    <div class="space-y-4">
-      <input id="destino" type="text" placeholder="Endereço destino" class="w-full p-2 border rounded-xl" />
-      <input id="valor" type="number" step="any" placeholder="Valor" class="w-full p-2 border rounded-xl" />
-
-      <div class="flex gap-4">
-        <button onclick="enviarETH()" class="flex-1 bg-green-600 text-white p-2 rounded-xl hover:bg-green-700">Enviar ETH</button>
-        <button onclick="enviarUSDT()" class="flex-1 bg-yellow-500 text-white p-2 rounded-xl hover:bg-yellow-600">Enviar USDT</button>
-      </div>
-
-      <div class="mt-4">
-        <div id="resultado" class="text-sm text-gray-800 font-mono whitespace-pre-wrap"></div>
-        <button onclick="copiarHash()" class="mt-2 bg-blue-600 text-white py-1 px-3 rounded-lg hover:bg-blue-700 text-sm hidden" id="btnCopiar">📋 Copiar hash</button>
+<body>
+  <div class="card">
+    <h2>🔍 Detalhes da Transação (Ethereum / USDT)</h2>
+    <div class="field">
+      <label for="txHash">Hash da Transação:</label><br>
+      <input type="text" id="txHash" size="70" placeholder="Cole a hash aqui">
+      <button onclick="fetchTx()">Buscar</button>
+    </div>
+    <div id="result" style="display:none;">
+      <div class="field"><label>Hash:</label> <span class="hash" id="hashText"></span> <button class="copy" onclick="copyHash()">📋 Copiar</button></div>
+      <div class="field"><label>De:</label> <span id="from"></span></div>
+      <div class="field"><label>Para:</label> <span id="to"></span></div>
+      <div class="field"><label>Valor:</label> <span id="value"></span></div>
+      <div class="field"><label>Status:</label> <span id="status"></span></div>
+      <div class="field"><label>Bloco:</label> <span id="blockNumber"></span></div>
+      <div class="field"><label>Gas Usado:</label> <span id="gasUsed"></span></div>
+      <div class="field" id="erc20Section" style="display:none;">
+        <label>Token ERC20:</label>
+        <div class="field"><label>Token:</label> <span id="erc20Token"></span></div>
+        <div class="field"><label>Valor Transferido:</label> <span id="erc20Value"></span></div>
       </div>
     </div>
   </div>
 
   <script>
-    const usdtAddress = "0xdAC17F958D2ee523a2206206994597C13D831ec7"; // USDT Ethereum
-    const usdtAbi = [
-      "function transfer(address to, uint amount) public returns (bool)"
+    const provider = new ethers.providers.JsonRpcProvider("https://virtual.mainnet.rpc.tenderly.co/1982c95f-1cdd-43dc-a73b-9223e1800cea");
+
+    const ERC20_ABI = [
+      "function decimals() view returns (uint8)",
+      "function symbol() view returns (string)",
     ];
 
-    let ultimaHash = "";
-
-    async function getSigner() {
-      if (!window.ethereum) {
-        alert("MetaMask não está instalada.");
-        return null;
-      }
-
+    async function fetchTx() {
+      const hash = document.getElementById('txHash').value;
       try {
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        return await provider.getSigner();
-      } catch (e) {
-        alert("Erro ao conectar MetaMask: " + e.message);
-        return null;
-      }
-    }
+        const tx = await provider.getTransaction(hash);
+        const receipt = await provider.getTransactionReceipt(hash);
+        if (!tx || !receipt) throw new Error("Transação não encontrada!");
 
-    async function enviarETH() {
-      const signer = await getSigner();
-      if (!signer) return;
+        document.getElementById('hashText').textContent = hash;
+        document.getElementById('from').textContent = tx.from;
+        document.getElementById('to').textContent = tx.to || 'Contrato';
+        document.getElementById('value').textContent = ethers.utils.formatEther(tx.value) + " ETH";
+        document.getElementById('status').textContent = receipt.status === 1 ? "✅ Sucesso" : "❌ Falhou";
+        document.getElementById('blockNumber').textContent = tx.blockNumber;
+        document.getElementById('gasUsed').textContent = receipt.gasUsed.toString();
+        document.getElementById('result').style.display = 'block';
 
-      const destino = document.getElementById("destino").value;
-      const valor = document.getElementById("valor").value;
+        // Verifica se é uma transferência ERC20
+        const transferTopic = ethers.utils.id("Transfer(address,address,uint256)");
+        const transferLog = receipt.logs.find(log => log.topics[0] === transferTopic);
 
-      try {
-        const tx = await signer.sendTransaction({
-          to: destino,
-          value: ethers.parseEther(valor)
-        });
-        ultimaHash = tx.hash;
-        mostrarHash("⛓️ Hash da transação ETH:\n" + tx.hash);
+        if (transferLog) {
+          const tokenAddress = transferLog.address;
+          const contract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+          const symbol = await contract.symbol();
+          const decimals = await contract.decimals();
+
+          const valueHex = transferLog.data;
+          const rawValue = ethers.BigNumber.from(valueHex);
+          const valueFormatted = ethers.utils.formatUnits(rawValue, decimals);
+
+          document.getElementById('erc20Section').style.display = 'block';
+          document.getElementById('erc20Token').textContent = `${symbol} (${tokenAddress})`;
+          document.getElementById('erc20Value').textContent = `${valueFormatted} ${symbol}`;
+        } else {
+          document.getElementById('erc20Section').style.display = 'none';
+        }
+
       } catch (err) {
-        mostrarHash("❌ Erro: " + err.message, false);
+        alert("Erro: " + err.message);
       }
     }
 
-    async function enviarUSDT() {
-      const signer = await getSigner();
-      if (!signer) return;
-
-      const destino = document.getElementById("destino").value;
-      const valor = document.getElementById("valor").value;
-
-      const contratoUSDT = new ethers.Contract(usdtAddress, usdtAbi, signer);
-
-      try {
-        const valorFormatado = ethers.parseUnits(valor, 6); // USDT = 6 casas decimais
-        const tx = await contratoUSDT.transfer(destino, valorFormatado);
-        ultimaHash = tx.hash;
-        mostrarHash("💸 Hash da transação USDT:\n" + tx.hash);
-      } catch (err) {
-        mostrarHash("❌ Erro: " + err.message, false);
-      }
-    }
-
-    function mostrarHash(texto, mostrarBotao = true) {
-      document.getElementById("resultado").innerText = texto;
-      document.getElementById("btnCopiar").classList.toggle("hidden", !mostrarBotao);
-    }
-
-    function copiarHash() {
-      if (!ultimaHash) return;
-      navigator.clipboard.writeText(ultimaHash).then(() => {
-        alert("Hash copiada com sucesso!");
-      });
+    function copyHash() {
+      const hash = document.getElementById('txHash').value;
+      navigator.clipboard.writeText(hash);
+      alert("Hash copiada!");
     }
   </script>
 </body>
