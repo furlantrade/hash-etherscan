@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Envio de ETH e USDT</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-lg mx-auto bg-white p-6 rounded-2xl shadow-lg">
+    <h1 class="text-2xl font-bold text-center text-blue-700 mb-4">Envio de ETH ou USDT</h1>
+
+    <div class="space-y-4">
+      <input id="destino" type="text" placeholder="Endereço destino" class="w-full p-2 border rounded-xl" />
+      <input id="valor" type="number" step="any" placeholder="Valor" class="w-full p-2 border rounded-xl" />
+
+      <div class="flex gap-4">
+        <button onclick="enviarETH()" class="flex-1 bg-green-600 text-white p-2 rounded-xl hover:bg-green-700">Enviar ETH</button>
+        <button onclick="enviarUSDT()" class="flex-1 bg-yellow-500 text-white p-2 rounded-xl hover:bg-yellow-600">Enviar USDT</button>
+      </div>
+
+      <div class="mt-4">
+        <div id="resultado" class="text-sm text-gray-800 font-mono whitespace-pre-wrap"></div>
+        <button onclick="copiarHash()" class="mt-2 bg-blue-600 text-white py-1 px-3 rounded-lg hover:bg-blue-700 text-sm hidden" id="btnCopiar">📋 Copiar hash</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const usdtAddress = "0xdAC17F958D2ee523a2206206994597C13D831ec7"; // USDT Ethereum
+    const usdtAbi = [
+      "function transfer(address to, uint amount) public returns (bool)"
+    ];
+
+    let ultimaHash = "";
+
+    async function getSigner() {
+      if (!window.ethereum) {
+        alert("MetaMask não está instalada.");
+        return null;
+      }
+
+      try {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        return await provider.getSigner();
+      } catch (e) {
+        alert("Erro ao conectar MetaMask: " + e.message);
+        return null;
+      }
+    }
+
+    async function enviarETH() {
+      const signer = await getSigner();
+      if (!signer) return;
+
+      const destino = document.getElementById("destino").value;
+      const valor = document.getElementById("valor").value;
+
+      try {
+        const tx = await signer.sendTransaction({
+          to: destino,
+          value: ethers.parseEther(valor)
+        });
+        ultimaHash = tx.hash;
+        mostrarHash("⛓️ Hash da transação ETH:\n" + tx.hash);
+      } catch (err) {
+        mostrarHash("❌ Erro: " + err.message, false);
+      }
+    }
+
+    async function enviarUSDT() {
+      const signer = await getSigner();
+      if (!signer) return;
+
+      const destino = document.getElementById("destino").value;
+      const valor = document.getElementById("valor").value;
+
+      const contratoUSDT = new ethers.Contract(usdtAddress, usdtAbi, signer);
+
+      try {
+        const valorFormatado = ethers.parseUnits(valor, 6); // USDT = 6 casas decimais
+        const tx = await contratoUSDT.transfer(destino, valorFormatado);
+        ultimaHash = tx.hash;
+        mostrarHash("💸 Hash da transação USDT:\n" + tx.hash);
+      } catch (err) {
+        mostrarHash("❌ Erro: " + err.message, false);
+      }
+    }
+
+    function mostrarHash(texto, mostrarBotao = true) {
+      document.getElementById("resultado").innerText = texto;
+      document.getElementById("btnCopiar").classList.toggle("hidden", !mostrarBotao);
+    }
+
+    function copiarHash() {
+      if (!ultimaHash) return;
+      navigator.clipboard.writeText(ultimaHash).then(() => {
+        alert("Hash copiada com sucesso!");
+      });
+    }
+  </script>
+</body>
+</html>
