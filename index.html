@@ -1,103 +1,208 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <title>Transação na Rede Tenderly</title>
-  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ethereum Wallet Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; }
+    :root {
+      --bg-dark: #0d1117;
+      --bg-light: #f3f4f6;
+      --text-dark: #c9d1d9;
+      --text-light: #111;
+      --card-bg-dark: #161b22;
+      --card-bg-light: #fff;
+      --primary: #4ade80;
+      --danger: #f87171;
+      --muted: #9ca3af;
+      --button-blue: #1D4ED8; /* Azul */
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+      transition: all 0.3s ease;
+    }
+
+    [data-theme="light"] {
+      background-color: var(--bg-light);
+      color: var(--text-light);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      padding: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
     .card {
-      max-width: 650px; margin: auto; background: #fff; padding: 20px;
-      border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      background: var(--card-bg-dark);
+      padding: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      margin-bottom: 2rem;
     }
-    .field { margin-bottom: 12px; }
-    .field label { font-weight: bold; }
-    .hash, .address { word-break: break-all; }
+
+    [data-theme="light"] .card {
+      background: var(--card-bg-light);
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.7rem;
+      margin-bottom: 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #ccc;
+    }
+
     button {
-      padding: 8px 16px; background: #4CAF50; border: none;
-      border-radius: 5px; color: white; cursor: pointer;
+      padding: 0.8rem 1.5rem;
+      border: none;
+      background-color: var(--button-blue); /* Azul */
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 0.5rem;
     }
-    button.copy { background: #555; margin-left: 10px; }
+
+    .tx {
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      border-left: 4px solid var(--primary);
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+
+    .mode-switch {
+      text-align: center;
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>🔍 Detalhes da Transação (Ethereum / USDT)</h2>
-    <div class="field">
-      <label for="txHash">Hash da Transação:</label><br>
-      <input type="text" id="txHash" size="70" placeholder="Cole a hash aqui">
-      <button onclick="fetchTx()">Buscar</button>
+  <div class="container">
+    <h1>Ethereum Wallet Dashboard</h1>
+    <div class="card">
+      <label for="wallet">🔐 Wallet Address</label>
+      <input type="text" id="wallet" placeholder="0x..." />
+      <button onclick="checkWallet()">Check Wallet</button>
     </div>
-    <div id="result" style="display:none;">
-      <div class="field"><label>Hash:</label> <span class="hash" id="hashText"></span> <button class="copy" onclick="copyHash()">📋 Copiar</button></div>
-      <div class="field"><label>De:</label> <span id="from"></span></div>
-      <div class="field"><label>Para:</label> <span id="to"></span></div>
-      <div class="field"><label>Valor:</label> <span id="value"></span></div>
-      <div class="field"><label>Status:</label> <span id="status"></span></div>
-      <div class="field"><label>Bloco:</label> <span id="blockNumber"></span></div>
-      <div class="field"><label>Gas Usado:</label> <span id="gasUsed"></span></div>
-      <div class="field" id="erc20Section" style="display:none;">
-        <label>Token ERC20:</label>
-        <div class="field"><label>Token:</label> <span id="erc20Token"></span></div>
-        <div class="field"><label>Valor Transferido:</label> <span id="erc20Value"></span></div>
-      </div>
+    <div class="card" id="result">Enter wallet address and click above.</div>
+    <div class="mode-switch">
+      <button onclick="toggleTheme()">🌗 Toggle Light/Dark Mode</button>
     </div>
   </div>
 
   <script>
-    const provider = new ethers.providers.JsonRpcProvider("https://virtual.mainnet.rpc.tenderly.co/1982c95f-1cdd-43dc-a73b-9223e1800cea");
-
+    const provider = new ethers.JsonRpcProvider("https://virtual.mainnet.rpc.tenderly.co/3ace3566-c7a8-417e-bb0e-e4a4636370e2");
+    const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
     const ERC20_ABI = [
+      "function balanceOf(address) view returns (uint)",
       "function decimals() view returns (uint8)",
       "function symbol() view returns (string)",
+      "event Transfer(address indexed from, address indexed to, uint256 value)"
     ];
 
-    async function fetchTx() {
-      const hash = document.getElementById('txHash').value;
+    async function checkWallet() {
+      const address = document.getElementById("wallet").value.trim();
+      const result = document.getElementById("result");
+      result.innerHTML = "⏳ Loading...";
+
+      if (!ethers.isAddress(address)) {
+        result.innerHTML = "<p style='color:var(--danger)'>❌ Invalid address</p>";
+        return;
+      }
+
       try {
-        const tx = await provider.getTransaction(hash);
-        const receipt = await provider.getTransactionReceipt(hash);
-        if (!tx || !receipt) throw new Error("Transação não encontrada!");
+        const eth = ethers.formatEther(await provider.getBalance(address));
+        const usdt = new ethers.Contract(USDT_ADDRESS, ERC20_ABI, provider);
+        const usdtFormatted = ethers.formatUnits(await usdt.balanceOf(address), await usdt.decimals());
 
-        document.getElementById('hashText').textContent = hash;
-        document.getElementById('from').textContent = tx.from;
-        document.getElementById('to').textContent = tx.to || 'Contrato';
-        document.getElementById('value').textContent = ethers.utils.formatEther(tx.value) + " ETH";
-        document.getElementById('status').textContent = receipt.status === 1 ? "✅ Sucesso" : "❌ Falhou";
-        document.getElementById('blockNumber').textContent = tx.blockNumber;
-        document.getElementById('gasUsed').textContent = receipt.gasUsed.toString();
-        document.getElementById('result').style.display = 'block';
+        let html = `<p><strong>ETH:</strong> ${eth}</p><p><strong>USDT:</strong> ${usdtFormatted}</p><p><strong>🔽 Recent ETH Transactions:</strong></p>`;
 
-        // Verifica se é uma transferência ERC20
-        const transferTopic = ethers.utils.id("Transfer(address,address,uint256)");
-        const transferLog = receipt.logs.find(log => log.topics[0] === transferTopic);
-
-        if (transferLog) {
-          const tokenAddress = transferLog.address;
-          const contract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-          const symbol = await contract.symbol();
-          const decimals = await contract.decimals();
-
-          const valueHex = transferLog.data;
-          const rawValue = ethers.BigNumber.from(valueHex);
-          const valueFormatted = ethers.utils.formatUnits(rawValue, decimals);
-
-          document.getElementById('erc20Section').style.display = 'block';
-          document.getElementById('erc20Token').textContent = `${symbol} (${tokenAddress})`;
-          document.getElementById('erc20Value').textContent = `${valueFormatted} ${symbol}`;
-        } else {
-          document.getElementById('erc20Section').style.display = 'none';
+        let count = 0;
+        const blockNum = await provider.getBlockNumber();
+        for (let i = blockNum; i > blockNum - 1000 && count < 10; i--) {
+          try {
+            const block = await provider.getBlockWithTransactions(i);
+            for (let tx of block.transactions) {
+              if (tx.from.toLowerCase() === address.toLowerCase()) {
+                html += `<div class='tx'>🔴 Sent ${ethers.formatEther(tx.value)} ETH to ${tx.to}<br><a href='https://etherscan.io/tx/${tx.hash}' target='_blank'>View Tx</a></div>`;
+                count++;
+                if (count >= 10) break;
+              }
+            }
+          } catch (err) {}
         }
 
-      } catch (err) {
-        alert("Erro: " + err.message);
+        html += `<p><strong>🔽 Recent USDT Transactions (Sent):</strong></p>`;
+        const usdtIface = new ethers.Interface(ERC20_ABI);
+        const currentBlock = await provider.getBlockNumber();
+        const logs = await provider.getLogs({
+          address: USDT_ADDRESS,
+          fromBlock: currentBlock - 2000,
+          toBlock: currentBlock,
+          topics: [
+            usdtIface.getEvent("Transfer").topicHash,
+            ethers.zeroPadValue(address.toLowerCase(), 32)
+          ]
+        });
+
+        const usdtTxs = logs.slice(0, 10);
+        if (usdtTxs.length === 0) html += `<p>No USDT transactions found.</p>`;
+        else {
+          for (const log of usdtTxs) {
+            const parsed = usdtIface.parseLog(log);
+            const to = parsed.args.to;
+            const value = ethers.formatUnits(parsed.args.value, 6);
+            html += `<div class='tx'>🔴 Sent ${value} USDT to ${to}<br><a href='https://etherscan.io/tx/${log.transactionHash}' target='_blank'>View Tx</a></div>`;
+          }
+        }
+
+        // Display received USDT transactions
+        const receivedLogs = await provider.getLogs({
+          address: USDT_ADDRESS,
+          fromBlock: currentBlock - 2000,
+          toBlock: currentBlock,
+          topics: [
+            usdtIface.getEvent("Transfer").topicHash,
+            ethers.zeroPadValue(address.toLowerCase(), 32)
+          ]
+        });
+
+        if (receivedLogs.length === 0) html += `<p>No incoming USDT transactions found.</p>`;
+        else {
+          for (const log of receivedLogs) {
+            const parsed = usdtIface.parseLog(log);
+            const from = parsed.args.from;
+            const value = ethers.formatUnits(parsed.args.value, 6);
+            html += `<div class='tx'>🔵 Received ${value} USDT from ${from}<br><a href='https://etherscan.io/tx/${log.transactionHash}' target='_blank'>View Tx</a></div>`;
+          }
+        }
+
+        result.innerHTML = html;
+      } catch (e) {
+        result.innerHTML = `<p style='color:var(--danger)'>❌ Error: ${e.message}</p>`;
       }
     }
 
-    function copyHash() {
-      const hash = document.getElementById('txHash').value;
-      navigator.clipboard.writeText(hash);
-      alert("Hash copiada!");
+    function toggleTheme() {
+      const html = document.documentElement;
+      html.setAttribute("data-theme", html.getAttribute("data-theme") === "dark" ? "light" : "dark");
     }
   </script>
 </body>
