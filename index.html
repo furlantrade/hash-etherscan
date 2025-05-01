@@ -1,209 +1,667 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ethereum Wallet Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
-  <style>
-    :root {
-      --bg-dark: #0d1117;
-      --bg-light: #f3f4f6;
-      --text-dark: #c9d1d9;
-      --text-light: #111;
-      --card-bg-dark: #161b22;
-      --card-bg-light: #fff;
-      --primary: #4ade80;
-      --danger: #f87171;
-      --muted: #9ca3af;
-      --button-blue: #1D4ED8; /* Azul */
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tenderly Viewer - Blockchain Transaction Explorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              300: '#86efac',
+              400: '#4ade80',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+            },
+            dark: {
+              50: '#f8fafc',
+              100: '#f1f5f9',
+              200: '#e2e8f0',
+              300: '#cbd5e1',
+              400: '#94a3b8',
+              500: '#64748b',
+              600: '#475569',
+              700: '#334155',
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Fira Code', 'monospace'],
+          },
+        }
+      }
     }
-
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+    
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: var(--bg-dark);
-      color: var(--text-dark);
+      font-family: 'Inter', sans-serif;
+      background-color: #0f172a;
+      color: #f1f5f9;
+    }
+    
+    .gradient-bg {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+    
+    .card-glass {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .input-field {
       transition: all 0.3s ease;
     }
-
-    [data-theme="light"] {
-      background-color: var(--bg-light);
-      color: var(--text-light);
+    
+    .input-field:focus {
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
     }
-
-    .container {
-      max-width: 800px;
-      margin: auto;
-      padding: 2rem;
+    
+    .copy-btn {
+      transition: all 0.2s ease;
     }
-
-    h1 {
+    
+    .copy-btn:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .copy-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-weight: 500;
+      font-size: 0.75rem;
+    }
+    
+    .status-success {
+      background-color: rgba(34, 197, 94, 0.1);
+      color: #22c55e;
+    }
+    
+    .status-fail {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+    
+    .token-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: #1e293b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 0.5rem;
+    }
+    
+    .animate-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+    
+    .tooltip {
+      position: relative;
+    }
+    
+    .tooltip .tooltip-text {
+      visibility: hidden;
+      width: 120px;
+      background-color: #1e293b;
+      color: #fff;
       text-align: center;
-      margin-bottom: 2rem;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -60px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 0.75rem;
+      border: 1px solid #334155;
     }
-
-    .card {
-      background: var(--card-bg-dark);
-      padding: 1.5rem;
-      border-radius: 1rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
-      margin-bottom: 2rem;
+    
+    .tooltip:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
     }
-
-    [data-theme="light"] .card {
-      background: var(--card-bg-light);
+    
+    .loading-spinner {
+      animation: spin 1s linear infinite;
     }
-
-    label {
-      font-weight: bold;
-      display: block;
-      margin-bottom: 0.3rem;
+    
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
     }
-
-    input {
-      width: 100%;
-      padding: 0.7rem;
-      margin-bottom: 1rem;
-      border-radius: 0.5rem;
-      border: 1px solid #ccc;
+    
+    .transaction-value {
+      font-family: 'Fira Code', monospace;
+      font-weight: 500;
     }
-
-    button {
-      padding: 0.8rem 1.5rem;
-      border: none;
-      background-color: var(--button-blue); /* Azul */
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      border-radius: 0.5rem;
+    
+    .address-link {
+      transition: all 0.2s ease;
     }
-
-    .tx {
-      margin-bottom: 1rem;
-      padding: 0.5rem;
-      border-left: 4px solid var(--primary);
-      background-color: rgba(255, 255, 255, 0.03);
+    
+    .address-link:hover {
+      color: #22c55e;
+      text-decoration: underline;
     }
-
-    .mode-switch {
-      text-align: center;
-      margin-top: 1rem;
+    
+    .info-card {
+      transition: all 0.3s ease;
+    }
+    
+    .info-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
   </style>
 </head>
-<body>
-  <div class="container">
-    <h1>Ethereum Wallet Dashboard</h1>
-    <div class="card">
-      <label for="wallet">🔐 Wallet Address</label>
-      <input type="text" id="wallet" placeholder="0x..." />
-      <button onclick="checkWallet()">Check Wallet</button>
+<body class="min-h-screen gradient-bg">
+  <div class="container mx-auto px-4 py-8 max-w-5xl">
+    <!-- Header -->
+    <header class="mb-8 text-center">
+      <div class="flex items-center justify-center mb-4">
+        <i class="fas fa-link text-primary-500 text-3xl mr-3"></i>
+        <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent">
+          Tenderly Transaction Viewer
+        </h1>
+      </div>
+      <p class="text-dark-400 max-w-2xl mx-auto">
+        Explore detailed information about any Ethereum transaction. Get real-time data including status, gas fees, token transfers and more.
+      </p>
+    </header>
+
+    <!-- Search Section -->
+    <div class="card-glass rounded-xl p-6 mb-8 shadow-lg">
+      <div class="mb-6">
+        <label for="hash" class="block text-sm font-medium text-dark-300 mb-2">
+          <i class="fas fa-search mr-2"></i> Transaction Hash
+        </label>
+        <div class="relative">
+          <input
+            type="text"
+            id="hash"
+            placeholder="Enter transaction hash (0x...)"
+            class="w-full input-field bg-dark-800 border border-dark-600 text-dark-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+          <button
+            onclick="buscarTransacao()"
+            class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
+          >
+            <i class="fas fa-rocket mr-2"></i> Search
+          </button>
+        </div>
+        <p class="mt-2 text-xs text-dark-400">
+          Example: 0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060
+        </p>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-dark-800 rounded-lg p-4 flex items-center">
+          <div class="bg-dark-700 p-3 rounded-full mr-4">
+            <i class="fas fa-network-wired text-primary-500"></i>
+          </div>
+          <div>
+            <p class="text-xs text-dark-400">Network</p>
+            <p class="font-medium">Ethereum Mainnet</p>
+          </div>
+        </div>
+        <div class="bg-dark-800 rounded-lg p-4 flex items-center">
+          <div class="bg-dark-700 p-3 rounded-full mr-4">
+            <i class="fas fa-plug text-primary-500"></i>
+          </div>
+          <div>
+            <p class="text-xs text-dark-400">RPC Provider</p>
+            <p class="font-medium">Tenderly</p>
+          </div>
+        </div>
+        <div class="bg-dark-800 rounded-lg p-4 flex items-center">
+          <div class="bg-dark-700 p-3 rounded-full mr-4">
+            <i class="fas fa-bolt text-primary-500"></i>
+          </div>
+          <div>
+            <p class="text-xs text-dark-400">API Status</p>
+            <p class="font-medium text-primary-500">Operational</p>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="card" id="result">Enter wallet address and click above.</div>
-    <div class="mode-switch">
-      <button onclick="toggleTheme()">🌗 Toggle Light/Dark Mode</button>
+
+    <!-- Results Section -->
+    <div id="resultado" class="hidden">
+      <!-- Overview Card -->
+      <div class="card-glass rounded-xl p-6 mb-6 shadow-lg">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold flex items-center">
+            <i class="fas fa-info-circle mr-3 text-primary-500"></i>
+            Transaction Overview
+          </h2>
+          <div id="tx-status" class="status-badge status-success">
+            <i class="fas fa-check-circle mr-1.5"></i>
+            <span>Success</span>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div class="info-card bg-dark-800 rounded-lg p-4 border border-dark-700">
+            <h3 class="text-sm font-medium text-dark-400 mb-3">TRANSACTION HASH</h3>
+            <div class="flex items-center justify-between">
+              <p id="tx-hash" class="font-mono text-sm break-all"></p>
+              <button onclick="copyToClipboard('tx-hash')" class="copy-btn text-dark-400 hover:text-primary-500 p-1 rounded">
+                <i class="far fa-copy"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="info-card bg-dark-800 rounded-lg p-4 border border-dark-700">
+            <h3 class="text-sm font-medium text-dark-400 mb-3">BLOCK</h3>
+            <p id="tx-block" class="font-medium"></p>
+          </div>
+          
+          <div class="info-card bg-dark-800 rounded-lg p-4 border border-dark-700">
+            <h3 class="text-sm font-medium text-dark-400 mb-3">FROM</h3>
+            <div class="flex items-center justify-between">
+              <p id="tx-from" class="font-mono text-sm break-all"></p>
+              <button onclick="copyToClipboard('tx-from')" class="copy-btn text-dark-400 hover:text-primary-500 p-1 rounded">
+                <i class="far fa-copy"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="info-card bg-dark-800 rounded-lg p-4 border border-dark-700">
+            <h3 class="text-sm font-medium text-dark-400 mb-3">TO</h3>
+            <div class="flex items-center justify-between">
+              <p id="tx-to" class="font-mono text-sm break-all"></p>
+              <button onclick="copyToClipboard('tx-to')" class="copy-btn text-dark-400 hover:text-primary-500 p-1 rounded">
+                <i class="far fa-copy"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="info-card bg-dark-800 rounded-lg p-4 border border-dark-700">
+            <h3 class="text-sm font-medium text-dark-400 mb-3">VALUE</h3>
+            <div class="flex items-center">
+              <div id="token-icon" class="token-icon">
+                <i class="fab fa-ethereum text-primary-500 text-xs"></i>
+              </div>
+              <p id="tx-value" class="transaction-value font-medium"></p>
+            </div>
+          </div>
+          
+          <div class="info-card bg-dark-800 rounded-lg p-4 border border-dark-700">
+            <h3 class="text-sm font-medium text-dark-400 mb-3">TRANSACTION FEE</h3>
+            <p id="tx-fee" class="font-medium"></p>
+          </div>
+          
+          <div class="info-card bg-dark-800 rounded-lg p-4 border border-dark-700">
+            <h3 class="text-sm font-medium text-dark-400 mb-3">GAS PRICE</h3>
+            <p id="tx-gas-price" class="font-medium"></p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Details Section -->
+      <div class="card-glass rounded-xl p-6 mb-6 shadow-lg">
+        <h2 class="text-xl font-bold mb-6 flex items-center">
+          <i class="fas fa-file-alt mr-3 text-primary-500"></i>
+          Transaction Details
+        </h2>
+        
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-dark-700">
+            <tbody class="divide-y divide-dark-700">
+              <tr>
+                <td class="py-3 px-4 text-sm font-medium text-dark-400 whitespace-nowrap">Nonce</td>
+                <td id="tx-nonce" class="py-3 px-4 text-sm font-mono"></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 text-sm font-medium text-dark-400 whitespace-nowrap">Gas Limit</td>
+                <td id="tx-gas-limit" class="py-3 px-4 text-sm"></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 text-sm font-medium text-dark-400 whitespace-nowrap">Gas Used</td>
+                <td id="tx-gas-used" class="py-3 px-4 text-sm"></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 text-sm font-medium text-dark-400 whitespace-nowrap">Efficiency</td>
+                <td id="tx-efficiency" class="py-3 px-4 text-sm"></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 text-sm font-medium text-dark-400 whitespace-nowrap">Input Data</td>
+                <td class="py-3 px-4 text-sm">
+                  <div class="flex items-center justify-between">
+                    <p id="tx-input" class="font-mono text-xs break-all"></p>
+                    <button onclick="copyToClipboard('tx-input')" class="copy-btn text-dark-400 hover:text-primary-500 p-1 rounded ml-2">
+                      <i class="far fa-copy"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Token Transfer Section -->
+      <div id="token-transfer-section" class="card-glass rounded-xl p-6 shadow-lg">
+        <h2 class="text-xl font-bold mb-6 flex items-center">
+          <i class="fas fa-exchange-alt mr-3 text-primary-500"></i>
+          Token Transfer
+        </h2>
+        
+        <div class="bg-dark-800 rounded-lg p-4 border border-dark-700">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <h3 class="text-sm font-medium text-dark-400 mb-2">TOKEN</h3>
+              <div class="flex items-center">
+                <div id="transfer-token-icon" class="token-icon">
+                  <i class="fas fa-coins text-primary-500 text-xs"></i>
+                </div>
+                <p id="transfer-token" class="font-medium"></p>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-dark-400 mb-2">AMOUNT</h3>
+              <p id="transfer-amount" class="transaction-value font-medium"></p>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-dark-400 mb-2">RECIPIENT</h3>
+              <div class="flex items-center justify-between">
+                <p id="transfer-recipient" class="font-mono text-sm break-all"></p>
+                <button onclick="copyToClipboard('transfer-recipient')" class="copy-btn text-dark-400 hover:text-primary-500 p-1 rounded">
+                  <i class="far fa-copy"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-between text-xs text-dark-400">
+            <div class="flex items-center">
+              <i class="fas fa-info-circle mr-1"></i>
+              <span>ERC-20 Token Transfer</span>
+            </div>
+            <button onclick="viewOnEtherscan()" class="text-primary-500 hover:text-primary-400 flex items-center">
+              <i class="fas fa-external-link-alt mr-1"></i>
+              View on Etherscan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Loading State -->
+    <div id="loading" class="hidden text-center py-12">
+      <div class="inline-block bg-dark-800 p-6 rounded-full mb-4">
+        <i class="fas fa-circle-notch loading-spinner text-3xl text-primary-500"></i>
+      </div>
+      <h3 class="text-lg font-medium mb-2">Fetching Transaction Data</h3>
+      <p class="text-dark-400 max-w-md mx-auto">
+        Retrieving transaction details from the Ethereum blockchain. This may take a few moments...
+      </p>
+    </div>
+    
+    <!-- Error State -->
+    <div id="error" class="hidden text-center py-12">
+      <div class="inline-block bg-dark-800 p-6 rounded-full mb-4">
+        <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+      </div>
+      <h3 class="text-lg font-medium mb-2">Transaction Not Found</h3>
+      <p id="error-message" class="text-dark-400 max-w-md mx-auto mb-6">
+        The transaction hash you entered could not be found. Please check the hash and try again.
+      </p>
+      <button onclick="resetSearch()" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-2 rounded-md font-medium transition-colors">
+        <i class="fas fa-redo mr-2"></i> Try Again
+      </button>
     </div>
   </div>
 
   <script>
-    const provider = new ethers.JsonRpcProvider("https://virtual.mainnet.rpc.tenderly.co/4246cfc7-3d37-45a2-b181-af58e8e8ea93");
-    const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-    const ERC20_ABI = [
-      "function balanceOf(address) view returns (uint)",
-      "function decimals() view returns (uint8)",
-      "function symbol() view returns (string)",
-      "event Transfer(address indexed from, address indexed to, uint256 value)"
-    ];
-
-    async function checkWallet() {
-      const address = document.getElementById("wallet").value.trim();
-      const result = document.getElementById("result");
-      result.innerHTML = "⏳ Loading...";
-
-      if (!ethers.isAddress(address)) {
-        result.innerHTML = "<p style='color:var(--danger)'>❌ Invalid address</p>";
+    const rpcUrl = "https://virtual.mainnet.rpc.tenderly.co/4246cfc7-3d37-45a2-b181-af58e8e8ea93";
+    
+    // Format ETH values
+    function formatEth(value) {
+      return parseFloat(value).toLocaleString(undefined, {
+        minimumFractionDigits: 6,
+        maximumFractionDigits: 6
+      });
+    }
+    
+    // Copy to clipboard function
+    function copyToClipboard(elementId) {
+      const element = document.getElementById(elementId);
+      const text = element.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalIcon = element.nextElementSibling.querySelector('i');
+        const originalClass = originalIcon.className;
+        
+        originalIcon.className = 'fas fa-check text-primary-500';
+        setTimeout(() => {
+          originalIcon.className = originalClass;
+        }, 2000);
+      });
+    }
+    
+    // View on Etherscan
+    function viewOnEtherscan() {
+      const hash = document.getElementById('hash').value.trim();
+      if (hash) {
+        window.open(`https://etherscan.io/tx/${hash}`, '_blank');
+      }
+    }
+    
+    // Reset search
+    function resetSearch() {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('error').classList.add('hidden');
+      document.getElementById('resultado').classList.add('hidden');
+      document.getElementById('hash').value = '';
+      document.getElementById('hash').focus();
+    }
+    
+    // Main function to fetch transaction
+    async function buscarTransacao() {
+      const hash = document.getElementById('hash').value.trim();
+      
+      // Validate input
+      if (!hash.startsWith('0x') || hash.length !== 66) {
+        alert('Invalid transaction hash! Please enter a valid 66-character hash starting with 0x.');
         return;
       }
-
+      
+      // Show loading state
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('error').classList.add('hidden');
+      document.getElementById('resultado').classList.add('hidden');
+      
       try {
-        const eth = ethers.formatEther(await provider.getBalance(address));
-        const usdt = new ethers.Contract(USDT_ADDRESS, ERC20_ABI, provider);
-        const usdtFormatted = ethers.formatUnits(await usdt.balanceOf(address), await usdt.decimals());
-
-        let html = `<p><strong>ETH:</strong> ${eth}</p><p><strong>USDT:</strong> ${usdtFormatted}</p><p><strong>🔽 Recent ETH Transactions:</strong></p>`;
-
-        let count = 0;
-        const blockNum = await provider.getBlockNumber();
-        for (let i = blockNum; i > blockNum - 1000 && count < 10; i--) {
-          try {
-            const block = await provider.getBlockWithTransactions(i);
-            for (let tx of block.transactions) {
-              if (tx.from.toLowerCase() === address.toLowerCase()) {
-                html += `<div class='tx'>🔴 Sent ${ethers.formatEther(tx.value)} ETH to ${tx.to}<br><a href='https://etherscan.io/tx/${tx.hash}' target='_blank'>View Tx</a></div>`;
-                count++;
-                if (count >= 10) break;
-              }
-            }
-          } catch (err) {}
+        const [tx, receipt] = await Promise.all([
+          rpcCall('eth_getTransactionByHash', [hash]),
+          rpcCall('eth_getTransactionReceipt', [hash])
+        ]);
+        
+        if (!tx) {
+          throw new Error('Transaction not found');
         }
-
-        html += `<p><strong>🔽 Recent USDT Transactions (Sent):</strong></p>`;
-        const usdtIface = new ethers.Interface(ERC20_ABI);
-        const currentBlock = await provider.getBlockNumber();
-        const logs = await provider.getLogs({
-          address: USDT_ADDRESS,
-          fromBlock: currentBlock - 2000,
-          toBlock: currentBlock,
-          topics: [
-            usdtIface.getEvent("Transfer").topicHash,
-            ethers.zeroPadValue(address.toLowerCase(), 32)
-          ]
-        });
-
-        const usdtTxs = logs.slice(0, 10);
-        if (usdtTxs.length === 0) html += `<p>No USDT transactions found.</p>`;
-        else {
-          for (const log of usdtTxs) {
-            const parsed = usdtIface.parseLog(log);
-            const to = parsed.args.to;
-            const value = ethers.formatUnits(parsed.args.value, 6);
-            html += `<div class='tx'>🔴 Sent ${value} USDT to ${to}<br><a href='https://etherscan.io/tx/${log.transactionHash}' target='_blank'>View Tx</a></div>`;
-          }
+        
+        // Process transaction data
+        const status = receipt && receipt.status === '0x1';
+        const block = parseInt(tx.blockNumber, 16);
+        const gasUsed = parseInt(receipt.gasUsed, 16);
+        const gasPrice = parseInt(tx.gasPrice, 16);
+        const feeEth = (gasUsed * gasPrice / 1e18).toFixed(6);
+        const gasPriceGwei = (gasPrice / 1e9).toFixed(3);
+        const nonce = parseInt(tx.nonce, 16);
+        const gasLimit = parseInt(tx.gas, 16);
+        const efficiency = ((gasUsed / gasLimit) * 100).toFixed(2);
+        
+        let valueEth = (parseInt(tx.value, 16) / 1e18).toFixed(6);
+        let tokenName = "";
+        let tokenSymbol = "";
+        let tokenDecimals = 18;
+        let tokenAmount = "";
+        let recipient = tx.to;
+        let isTokenTransfer = false;
+        
+        // Check for ERC-20 token transfer
+        if (tx.input && tx.input.startsWith('0xa9059cbb')) {
+          isTokenTransfer = true;
+          const toAddress = '0x' + tx.input.slice(34, 74);
+          const rawValue = BigInt('0x' + tx.input.slice(74));
+          recipient = '0x' + toAddress.slice(24); // remove padding
+          
+          tokenName = await decodeTokenName(tx.to);
+          tokenSymbol = await decodeTokenSymbol(tx.to);
+          const decimalsHex = await ethCall(tx.to, '0x313ce567');
+          tokenDecimals = decimalsHex ? parseInt(decimalsHex, 16) : 18;
+          tokenAmount = Number(rawValue) / Math.pow(10, tokenDecimals);
+          
+          valueEth = tokenAmount.toFixed(6);
         }
-
-        // Display received USDT transactions
-        const receivedLogs = await provider.getLogs({
-          address: USDT_ADDRESS,
-          fromBlock: currentBlock - 2000,
-          toBlock: currentBlock,
-          topics: [
-            usdtIface.getEvent("Transfer").topicHash,
-            ethers.zeroPadValue(address.toLowerCase(), 32)
-          ]
-        });
-
-        if (receivedLogs.length === 0) html += `<p>No incoming USDT transactions found.</p>`;
-        else {
-          for (const log of receivedLogs) {
-            const parsed = usdtIface.parseLog(log);
-            const from = parsed.args.from;
-            const value = ethers.formatUnits(parsed.args.value, 6);
-            html += `<div class='tx'>🔵 Received ${value} USDT from ${from}<br><a href='https://etherscan.io/tx/${log.transactionHash}' target='_blank'>View Tx</a></div>`;
-          }
+        
+        // Update UI with transaction data
+        document.getElementById('tx-status').className = status ? 
+          'status-badge status-success' : 'status-badge status-fail';
+        document.getElementById('tx-status').innerHTML = status ? 
+          '<i class="fas fa-check-circle mr-1.5"></i><span>Success</span>' : 
+          '<i class="fas fa-times-circle mr-1.5"></i><span>Failed</span>';
+        
+        document.getElementById('tx-hash').textContent = tx.hash;
+        document.getElementById('tx-block').textContent = block;
+        document.getElementById('tx-from').textContent = tx.from;
+        document.getElementById('tx-to').textContent = recipient || '(Contract Creation)';
+        document.getElementById('tx-value').textContent = `${formatEth(valueEth)} ${tokenSymbol || 'ETH'}`;
+        document.getElementById('tx-fee').textContent = `${feeEth} ETH`;
+        document.getElementById('tx-gas-price').textContent = `${gasPriceGwei} Gwei`;
+        document.getElementById('tx-nonce').textContent = nonce;
+        document.getElementById('tx-gas-limit').textContent = gasLimit.toLocaleString();
+        document.getElementById('tx-gas-used').textContent = gasUsed.toLocaleString();
+        document.getElementById('tx-efficiency').textContent = `${efficiency}%`;
+        document.getElementById('tx-input').textContent = tx.input || '0x';
+        
+        // Update token transfer section if applicable
+        if (isTokenTransfer) {
+          document.getElementById('token-transfer-section').classList.remove('hidden');
+          document.getElementById('transfer-token').textContent = `${tokenName} (${tokenSymbol})`;
+          document.getElementById('transfer-amount').textContent = `${formatEth(tokenAmount)} ${tokenSymbol}`;
+          document.getElementById('transfer-recipient').textContent = recipient;
+          
+          // Update token icon (simplified - in a real app you'd fetch the actual token logo)
+          const tokenIcon = document.getElementById('transfer-token-icon');
+          tokenIcon.innerHTML = tokenSymbol ? 
+            `<span class="text-xs font-bold">${tokenSymbol.substring(0, 3)}</span>` : 
+            '<i class="fas fa-coins text-primary-500 text-xs"></i>';
+        } else {
+          document.getElementById('token-transfer-section').classList.add('hidden');
         }
-
-        result.innerHTML = html;
-      } catch (e) {
-        result.innerHTML = `<p style='color:var(--danger)'>❌ Error: ${e.message}</p>`;
+        
+        // Hide loading and show results
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('resultado').classList.remove('hidden');
+        
+      } catch (err) {
+        console.error('Error fetching transaction:', err);
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('error').classList.remove('hidden');
+        document.getElementById('error-message').textContent = 
+          err.message || 'An error occurred while fetching the transaction. Please try again.';
       }
     }
-
-    function toggleTheme() {
-      const html = document.documentElement;
-      html.setAttribute("data-theme", html.getAttribute("data-theme") === "dark" ? "light" : "dark");
+    
+    // RPC call helper
+    async function rpcCall(method, params) {
+      const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: method,
+          params: params
+        })
+      });
+      const data = await response.json();
+      return data.result;
     }
+    
+    // eth_call helper
+    async function ethCall(to, data) {
+      const result = await rpcCall('eth_call', [{
+        to: to,
+        data: data
+      }, 'latest']);
+      return result;
+    }
+    
+    // Decode token name
+    async function decodeTokenName(address) {
+      const result = await ethCall(address, '0x06fdde03'); // name()
+      return decodeAbiString(result);
+    }
+    
+    // Decode token symbol
+    async function decodeTokenSymbol(address) {
+      const result = await ethCall(address, '0x95d89b41'); // symbol()
+      return decodeAbiString(result);
+    }
+    
+    // Decode ABI string
+    function decodeAbiString(hex) {
+      if (!hex || hex === '0x') return '';
+      const offset = parseInt(hex.slice(2, 66), 16);
+      const length = parseInt(hex.slice(66, 130), 16);
+      const strHex = hex.slice(130, 130 + length * 2);
+      let result = '';
+      for (let i = 0; i < strHex.length; i += 2) {
+        const code = parseInt(strHex.substr(i, 2), 16);
+        if (code) result += String.fromCharCode(code);
+      }
+      return result;
+    }
+    
+    // Handle Enter key press
+    document.getElementById('hash').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        buscarTransacao();
+      }
+    });
   </script>
 </body>
 </html>
